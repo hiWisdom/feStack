@@ -18,6 +18,8 @@ export default function HeaderLayout() {
   //variable for current/active link
   const currentPath = window.location.pathname;
 
+  const isActiveLink =   active = currentPath === item.url; // match URL instead of state
+
   return (
     <>
     <header className="fixed top-0 left-0 w-full h-20 bg-white shadow-md z-40 flex items-center px-6">
@@ -30,8 +32,8 @@ export default function HeaderLayout() {
     <nav className="flex-1 flex justify-center">
         <ul className="flex gap-8">
           {navItems.map(item => {
-            active = currentPath === item.url; // match URL instead of state
-            const isActive = active;
+          
+            const isActive = isActiveLink;
             return (
               <li key={item.title}>
                 <a
