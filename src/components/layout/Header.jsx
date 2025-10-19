@@ -30,12 +30,13 @@ export default function HeaderLayout() {
     <nav className="flex-1 flex justify-center">
         <ul className="flex gap-8">
           {navItems.map(item => {
-            const isActive = currentPath === item.url; // ✅ match URL instead of state
-
+            active = currentPath === item.url; // match URL instead of state
+            const isActive = active;
             return (
               <li key={item.title}>
                 <a
                   href={item.url}
+                  onClick={() => setActive(item.title)}
                   className={`px-4 py-2 rounded-xl text-base font-medium flex items-center gap-2 transition 
                     ${
                       isActive

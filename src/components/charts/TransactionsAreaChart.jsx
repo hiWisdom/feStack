@@ -7,8 +7,6 @@ import {
   ResponsiveContainer,
   Tooltip,
   XAxis,
-  YAxis,
-  Label,
 } from "recharts";
 
 export default function TransactionsAreaChart() {
