@@ -13,12 +13,10 @@ const navItems = [
 export default function HeaderLayout() {
 
   //create active state for nav items
-  const [active, setActive] = useState("Home"); 
+  const [_active, setActive] = useState("Home"); 
 
   //variable for current/active link
   const currentPath = window.location.pathname;
-
-  const isActiveLink =   active = currentPath === item.url; // match URL instead of state
 
   return (
     <>
@@ -32,8 +30,8 @@ export default function HeaderLayout() {
     <nav className="flex-1 flex justify-center">
         <ul className="flex gap-8">
           {navItems.map(item => {
-          
-            const isActive = isActiveLink;
+            const isActive = currentPath === item.url; // match URL instead of state
+
             return (
               <li key={item.title}>
                 <a
