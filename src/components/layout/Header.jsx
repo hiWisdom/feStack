@@ -13,7 +13,7 @@ const navItems = [
 export default function HeaderLayout() {
 
   //create active state for nav items
-  const [_active, setActive] = useState("Home"); 
+  const [ setActive] = useState("Home"); 
 
   //variable for current/active link
   const currentPath = window.location.pathname;
