@@ -37,18 +37,9 @@ export default function TransactionsAreaChart() {
 
         setData(formattedData);
 
-        // const first = formattedData[0].date;
-        // const last = formattedData[formattedData.length - 1].date;
-
-        // const format = (d) =>
-        //   new Date(d).toLocaleDateString("en-US", {
-        //     month: "short",
-        //     day: "numeric",
-        //     year: "numeric",
-        //   });
-
-        // setDateRange(`${format(first)} to ${format(last)}`);
-      } catch (err) {
+      } 
+      
+      catch (err) {
         console.error("Failed to fetch transactions:", err);
       }
     };
@@ -57,22 +48,37 @@ export default function TransactionsAreaChart() {
   }, []);
 
   return (
-    <ResponsiveContainer width="100%" height={260}>
-      <AreaChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 30 }}>
-        {/* <CartesianGrid strokeDasharray="3 3" vertical={false} /> */}
-        {/* ✅ XAxis dates removed */}
+
+    <div className="w-full">
+
+  
+
+    <ResponsiveContainer width="100%" height={400} className={`flex`}>
+
+      <AreaChart data={data} margin={{ top: 10, right: 10, left: 0, }}>
         <XAxis dataKey="date" tick={false} axisLine={false} />
-        {/* <YAxis tickLine={false} axisLine={false} fontSize={12} />
-         */}
         <Tooltip />
         <Area type="monotone" dataKey="amount" stroke="#ff5403" fill="#fff" fillOpacity={0.2} />
 
+
+
+      </AreaChart>
+
+    </ResponsiveContainer>
+   
+
+{/*     
+      <div
+        className="border-t-2 border-[#DBDEE5] rounded-t-2xl flex w-full justify-between px-2 mt-[-20px] mb-4"
+      > */}
+
+<div
+  className="border-t-2 border-[#DBDEE5] flex w-full justify-between px-2 -mt-10 lg:mb-10"
+>
         {/* Bottom date range labels */}
 
+
         <text
-          x="0%"
-          y={250}
-          textAnchor="start"
           fontSize={13}
           fontWeight={500}
         >
@@ -80,17 +86,16 @@ export default function TransactionsAreaChart() {
         </text>
 
         <text
-          x="100%"
-          y={250}
-          textAnchor="end"
           fontSize={13}
           fontWeight={500}
         >
           {data.length > 0 ? new Date(data[data.length - 1].date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : ""}
         </text>
 
-      </AreaChart>
-    </ResponsiveContainer>
+      </div>
+    
+
+    </div>
   );
 }
 

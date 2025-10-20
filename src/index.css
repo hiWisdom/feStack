@@ -3,6 +3,7 @@
 @tailwind utilities;
 
 
+
 /* src/index.css or App.css */
 @font-face {
   font-family: 'Degular';
@@ -26,16 +27,10 @@ body {
 
 
 
-/* body {
-  margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+.recharts-wrapper *:focus,
+.recharts-wrapper:focus,
+svg:focus {
+  outline: none !important;
+  box-shadow: none !important;
 }
 
-code {
-  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
-    monospace;
-} */

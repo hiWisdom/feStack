@@ -4,13 +4,6 @@ import { FiX } from "react-icons/fi";
 import { CallMadeIcon, CallReceivedIcon } from "../ui/Icons";
 import { DownloadIcons, ExpandMoreIcon } from "../ui/Icons";
 
-/**
- * TransactionsTable.jsx
- * - Slide-in filter panel from the right
- * - Filter presets, date range from-to, type, status
- * - Click outside / ESC to close
- * - Clean (ESLint warnings removed)
- */
 
 const TRANSACTION_TYPES = [
   "Store transactions",
@@ -270,9 +263,9 @@ export default function TransactionsTable() {
   const summaryText = `${transactions.length} Transactions`;
 
   return (
-    <div className="w-full space-y-4 px-6 lg:px-10">
+    <div className="border-2 border-[red] w-full space-y-4 px-6 lg:px-10">
       {/* Top bar: summary left, actions right */}
-      <div className="flex items-center justify-between">
+      <div className="border-2 border-[yellow] px-6 flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-semibold">{summaryText}</h2>
           <p className="text-sm text-gray-500">Your transactions for the selected range</p>
@@ -281,21 +274,25 @@ export default function TransactionsTable() {
         <div className="flex items-center gap-2">
           <button
             onClick={() => setShowFilterPanel((v) => !v)}
-            className="inline-flex items-center gap-2 px-3 py-2 rounded hover:bg-gray-50"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[#EFF1F6] hover:bg-gray-50 lg:h-[46px]"
             aria-expanded={showFilterPanel}
             aria-controls="transactions-filter-panel"
           >
             <span>Filter</span>
-            <ExpandMoreIcon className="h-4 w-4" />
+            <div
+              className="border-2 border-[red] h-[20px] w-[20px]"
+            >
+              <ExpandMoreIcon />
+            </div>
           </button>
 
           <button
             onClick={exportCSV}
-            className="inline-flex items-center gap-2 px-3 py-2 bg-white rounded hover:bg-gray-50"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[#EFF1F6] hover:bg-gray-50 lg:h-[46px]"
             title="Export CSV"
           >
             <span className="text-sm">Export</span>
-            <DownloadIcons className="h-4 w-4" />
+            <DownloadIcons />
           </button>
         </div>
       </div>
@@ -445,8 +442,8 @@ export default function TransactionsTable() {
       )}
 
       {/* Transactions list */}
-      <div className="overflow-x-auto bg-white rounded">
-        <div className="min-w-full">
+      <div className="border-2 border-[red] overflow-x-auto bg-white rounded">
+        <div className="border-2 border-[red] w-full">
           <div className="bg-white">
             {loading ? (
               <div className="px-6 py-8 text-center text-gray-500">Loading transactions...</div>

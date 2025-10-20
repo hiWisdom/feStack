@@ -33,7 +33,7 @@ export default function HeaderLayout() {
 
   return (
     <>
-      <header className="fixed top-0 left-0 w-full h-20 bg-white shadow-md z-40 flex items-center px-6 rounded-full">
+      <header className="fixed top-0 left-0 w-full h-20 bg-white shadow-md z-40 flex items-center px-6 rounded-full ">
         <div className="mr-6 hidden md:block">
           <SiteLogo />
         </div>
