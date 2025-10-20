@@ -263,9 +263,9 @@ export default function TransactionsTable() {
   const summaryText = `${transactions.length} Transactions`;
 
   return (
-    <div className="border-2 border-[red] w-full space-y-4 px-6 lg:px-10">
+    <div className=" w-full space-y-4 px-6 lg:px-10">
       {/* Top bar: summary left, actions right */}
-      <div className="border-2 border-[yellow] px-6 flex items-center justify-between">
+      <div className=" px-6 flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-semibold">{summaryText}</h2>
           <p className="text-sm text-gray-500">Your transactions for the selected range</p>
@@ -280,7 +280,7 @@ export default function TransactionsTable() {
           >
             <span>Filter</span>
             <div
-              className="border-2 border-[red] h-[20px] w-[20px]"
+              className=" h-[20px] w-[20px]"
             >
               <ExpandMoreIcon />
             </div>
@@ -442,8 +442,8 @@ export default function TransactionsTable() {
       )}
 
       {/* Transactions list */}
-      <div className="border-2 border-[red] overflow-x-auto bg-white rounded">
-        <div className="border-2 border-[red] w-full">
+      <div className=" overflow-x-auto bg-white rounded">
+        <div className=" w-full">
           <div className="bg-white">
             {loading ? (
               <div className="px-6 py-8 text-center text-gray-500">Loading transactions...</div>
