@@ -1,244 +1,123 @@
-import React, { useState } from "react";
-import { FaHome, FaChartLine, FaMoneyBillWave, FaUsers, FaThLarge } from "react-icons/fa";
+// HeaderLayout.jsx
+import React, { useState, useEffect } from "react";
+import { FaMoneyBillWave } from "react-icons/fa";
+import { HomeIcon, AnalyticsIcon, CrmIcon, AppsIcon, NotificationsIcon, MessageIcon, MenuIcon } from "../ui/Icons";
+import Sidebar from "./Sidebar";
+import SiteLogo from "./SiteLogo";
+import axiosInstance from "../../services/axios";
 
 const navItems = [
-  { title: "Home", url: "/home", icon: <FaHome size={18} /> },
-  { title: "Analytics", url: "/analytics", icon: <FaChartLine size={18} /> },
+  { title: "Home", url: "/home", icon: <HomeIcon size={18} /> },
+  { title: "Analytics", url: "/analytics", icon: <AnalyticsIcon size={18} /> },
   { title: "Revenue", url: "/revenue", icon: <FaMoneyBillWave size={18} /> },
-  { title: "CRM", url: "/crm", icon: <FaUsers size={18} /> },
-  { title: "Apps", url: "/apps", icon: <FaThLarge size={18} /> }
+  { title: "CRM", url: "/crm", icon: <CrmIcon size={18} /> },
+  { title: "Apps", url: "/apps", icon: <AppsIcon size={18} /> }
 ];
 
-
 export default function HeaderLayout() {
-
-  //create active state for nav items
-  const [ setActive] = useState("Home"); 
-
-  //variable for current/active link
+  const [user, setUser] = useState(null);
+  const [menuOpen, setMenuOpen] = useState(false);
   const currentPath = window.location.pathname;
+
+  useEffect(() => {
+    const fetchUser = async () => {
+      try {
+        const res = await axiosInstance.get("/user");
+        setUser(res.data);
+      } catch (error) {
+        console.error("Error fetching user data:", error);
+      }
+    };
+    fetchUser();
+  }, []);
 
   return (
     <>
-    <header className="fixed top-0 left-0 w-full h-20 bg-white shadow-md z-40 flex items-center px-6">
-      {/* Left Menu Icon */}
-      <button className="text-2xl font-semibold mr-8">≡</button>
+      <header className="fixed top-0 left-0 w-full h-20 bg-white shadow-md z-40 flex items-center px-6 rounded-full">
+        <div className="mr-6 hidden md:block">
+          <SiteLogo />
+        </div>
 
-      {/* Center Navigation - perfectly centered */}
+        <div className="md:hidden flex-1">
+          <SiteLogo />
+        </div>
 
+        <nav className="hidden md:flex flex-1 justify-center">
+          <ul className="flex gap-8">
+            {navItems.map(item => {
+              const isActive = currentPath === item.url;
+              return (
+                <div key={item.title}>
+                  <a
+                    href={item.url}
+                    className={`px-4 py-2 rounded-xl text-base font-medium flex items-center gap-2 transition ${isActive ? "bg-black text-white" : "bg-transparent text-black hover:bg-black hover:text-white"}`}
+                  >
+                    {item.icon}
+                    {item.title}
+                  </a>
+                </div>
+              );
+            })}
+          </ul>
+        </nav>
 
-    <nav className="flex-1 flex justify-center">
-        <ul className="flex gap-8">
-          {navItems.map(item => {
-            const isActive = currentPath === item.url; // match URL instead of state
+        <div className="flex items-center gap-6 text-lg">
+          <button><NotificationsIcon/></button>
+          <button><MessageIcon/></button>
 
-            return (
-              <li key={item.title}>
-                <a
-                  href={item.url}
-                  onClick={() => setActive(item.title)}
-                  className={`px-4 py-2 rounded-xl text-base font-medium flex items-center gap-2 transition 
-                    ${
-                      isActive
-                        ? "bg-black text-white"
-                        : "bg-transparent text-black hover:bg-black hover:text-white"
-                    }`}
-                >
-                  {item.icon}
-                  {item.title}
-                </a>
-              </li>
-            );
-          })}
-        </ul>
-      </nav>
+          <div className="flex items-center justify-between bg-[#EFF1F6] p-1 rounded-[100px] cursor-pointer" onClick={() => setMenuOpen(!menuOpen)}>
+            <div className="flex items-center justify-center w-12 h-12 rounded-full bg-gradient-to-r from-[#5C6670] to-[#131316]">
+              <p className="text-white font-semibold text-lg">{user ? `${user.first_name[0]}${user.last_name[0]}` : "U"}</p>
+            </div>
+            <button className="p-2 rounded-md hover:bg-gray-200 transition"><MenuIcon /></button>
+          </div>
+        </div>
+      </header>
 
+      {menuOpen && (
+        <div className="fixed right-6 top-20 bg-white shadow-lg rounded-xl w-64 p-4 z-50">
+          <div className="grid gap-4 px-2">
 
-      {/* <nav className="flex-1 flex justify-center">
-        <ul className="flex gap-8">
-          {navItems.map(item => {
-            const isActive = active === item.title;
-            return (
-              <li key={item.title}>
-                <a
-                  href={item.url}
-                  onClick={() => setActive(item.title)}
-                  className={`px-4 py-2 rounded-xl text-base font-medium flex items-center gap-2 transition 
-                    ${
-                      isActive
-                        ? "bg-black text-white"
-                        : "bg-transparent text-black hover:bg-black hover:text-white"
-                    }`}
-                >
-                  {item.icon}
-                  {item.title}
-                </a>
-              </li>
-            );
-          })}
-        </ul>
-      </nav> */}
+            <div
+              className="flex gap-2"
+            >
+            
+              <div className="flex items-center justify-center w-12 h-12 rounded-full bg-gradient-to-r from-[#5C6670] to-[#131316]">
+                <p className="text-white font-semibold text-lg">{user ? `${user.first_name[0]}${user.last_name[0]}` : "U"}</p>
+              </div>
+          
+              <div>
+                <p className="font-semibold mb-2">{user?.first_name} {user?.last_name}</p>
+                <p className="text-xs text-gray-500">{user?.email}</p>
+              </div>
+              
+            </div>
+            
+            <div className="flex flex-col gap-3">
+                <div>Settings</div>
+                <div>Purchase History</div>
+                <div>Refer and Earn</div>
+                <div>Integrations</div>
+                <div>Report Bug</div>
+                <div>Switch Account</div>
+                <div>Sign Out</div>
+             
+            </div>
 
-      {/* <nav className="flex-1 flex justify-center">
-        <ul className="flex gap-8">
-          {navItems.map(item => (
-            <li key={item.title}>
-              <a href={item.url} className="text-base font-medium hover:opacity-80 transition">
-                {item.title}
-              </a>
-            </li>
-          ))}
-        </ul>
-      </nav> */}
+          </div>
 
-      {/* Right Icons */}
-      <div className="flex items-center gap-6 text-lg">
-        <button>🔔</button>
-        <button>⚙️</button>
-        <button>👤</button>
-      </div>
-    </header>
+        </div>
+      )}
+    
+    
+    
       {/* Floating Sidebar */}
-      <div className="fixed top-1/3 left-4 hidden md:flex flex-col gap-3 p-2 bg-white shadow-md rounded-xl z-40">
-        <button className="w-10 h-10 rounded-lg border flex items-center justify-center">?</button>
-        <button className="w-10 h-10 rounded-lg border flex items-center justify-center">?</button>
-        <button className="w-10 h-10 rounded-lg border flex items-center justify-center">?</button>
-        <button className="w-10 h-10 rounded-lg border flex items-center justify-center">?</button>
-      </div>
+       <div className="fixed top-1/3 hidden md:flex flex-col gap-3 z-40">
 
-      </>
+         <Sidebar />
+
+       </div>
+    
+    </>
   );
 }
-
-// import React from "react";
-// export default function HeaderLayout() {
-//   return (
-//     <header className="fixed top-0 left-0 w-full h-20 bg-white shadow-sm flex items-center px-8 z-50">
-//       {/* Left brand / logo */}
-//       <div className="flex items-center gap-2 font-semibold">
-//         <span className="text-xl">?</span>
-//         <span>Home</span>
-//       </div>
-
-//       {/* Center nav */}
-//       <nav className="hidden md:flex gap-8 mx-auto">
-//         <button className="font-medium">Home</button>
-//         <button className="font-medium">Analytics</button>
-//         <button className="font-medium px-4 py-2 rounded-full bg-black text-white">Revenue</button>
-//         <button className="font-medium">CRM</button>
-//         <button className="font-medium">Apps</button>
-//       </nav>
-
-//       {/* Right section */}
-//       <div className="ml-auto flex items-center gap-4">
-//         <button className="w-8 h-8 rounded-full border flex items-center justify-center">?</button>
-//         <button className="w-8 h-8 rounded-full border flex items-center justify-center">?</button>
-//         <button className="w-8 h-8 rounded-full border flex items-center justify-center">?</button>
-//       </div>
-//     </header>
-//   );
-// }
-
-
-
-
-
-
-
-
-
-
-
-// import { useState } from 'react';
-
-// export default function HeaderLayout() {
-//   const [active, setActive] = useState('Revenue');
-
-//   const navItems = [
-//     { title: "Home", url: "/home", icon: "?" },
-//     { title: "Analytics", url: "/analytics", icon: "?" },
-//     { title: "Revenue", url: "/revenue", icon: "?" },
-//     { title: "CRM", url: "/crm", icon: "?" },
-//     { title: "Apps", url: "/apps", icon: "?" }
-//   ];
-
-//   return (
-//     <header className="fixed top-0 left-0 w-full h-20 bg-white shadow-sm z-40 flex items-center px-6">
-//       {/* Left Menu Icon */}
-//       <button className="text-xl font-bold mr-6">?</button>
-
-//       {/* Center Navigation */}
-//       <nav className="hidden md:flex gap-8 mx-auto">
-//         {navItems.map(item => (
-//           <button
-//             key={item}
-//             onClick={() => setActive(item)}
-//             className={`${active === item ? 'font-semibold border-b-2' : 'text-gray-500'} pb-1`}
-//           >
-//             {item}
-//           </button>
-//         ))}
-//       </nav>
-
-//       {/* Right Icons */}
-//       <div className="ml-auto flex items-center gap-4">
-//         <button>?</button>
-//         <button>?</button>
-//         <button>?</button>
-//       </div>
-//     </header>
-//   );
-// }
-
-// import React from "react";
-
-// export default function HeaderLayout() {
-//   return (
-//     <header className="fixed top-0 left-0 w-full h-20 bg-white shadow-sm flex items-center px-8 z-50">
-//       {/* Left brand / logo */}
-//       <div className="flex items-center gap-2 font-semibold">
-//         <span className="text-xl">?</span>
-//         <span>Home</span>
-//       </div>
-
-//       {/* Center nav */}
-//       <nav className="hidden md:flex gap-8 mx-auto">
-//         <button className="font-medium">Home</button>
-//         <button className="font-medium">Analytics</button>
-//         <button className="font-medium px-4 py-2 rounded-full bg-black text-white">Revenue</button>
-//         <button className="font-medium">CRM</button>
-//         <button className="font-medium">Apps</button>
-//       </nav>
-
-//       {/* Right section */}
-//       <div className="ml-auto flex items-center gap-4">
-//         <button className="w-8 h-8 rounded-full border flex items-center justify-center">?</button>
-//         <button className="w-8 h-8 rounded-full border flex items-center justify-center">?</button>
-//         <button className="w-8 h-8 rounded-full border flex items-center justify-center">?</button>
-//       </div>
-//     </header>
-//   );
-// }
-
-// export default function Header() {
-//   return (
-//     <header className="w-full fixed top-0 left-0 bg-white h-20 flex items-center px-8 shadow-sm">
-//       <div className="flex items-center gap-2 font-semibold text-lg">
-//         <span>▦</span>
-//         <span>App</span>
-//       </div>
-//       <nav className="hidden md:flex ml-10 gap-6 text-sm">
-//         <a className="hover:underline">Home</a>
-//         <a className="hover:underline">Analytics</a>
-//         <a className="px-4 py-2 rounded-full bg-black text-white">Revenue</a>
-//         <a className="hover:underline">CRM</a>
-//         <a className="hover:underline">Apps</a>
-//       </nav>
-//       <div className="ml-auto flex items-center gap-4">
-//         <div className="w-9 h-9 rounded-full border flex items-center justify-center">?</div>
-//         <div className="w-9 h-9 rounded-full border flex items-center justify-center">?</div>
-//         <div className="w-9 h-9 rounded-full border flex items-center justify-center">?</div>
-//       </div>
-//     </header>
-//   )
-// }

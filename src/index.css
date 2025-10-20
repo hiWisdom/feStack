@@ -3,6 +3,26 @@
 @tailwind utilities;
 
 
+/* src/index.css or App.css */
+@font-face {
+  font-family: 'Degular';
+  src: url('public/assets/fonts/degular-regular.otf') format('opentype');
+  color: #56616B;
+  /* font-weight: 400; */
+  /* font-style: normal; */
+}
+
+
+@font-face {
+  font-family: 'DegularBold';
+  src: url('public/assets/fonts/degular-bold.otf') format('opentype');
+  font-weight: 400;
+  font-style: normal;
+}
+
+body {
+  font-family: 'Degular', sans-serif; /* fallback to sans-serif */
+}
 
 
 

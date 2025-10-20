@@ -1,62 +1,153 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, useRef } from "react";
 import axiosInstance from "../../services/axios";
-import { FiMoreVertical, FiDownload, FiFileText, FiUser, FiFilter, FiChevronLeft, FiChevronRight, FiSearch } from "react-icons/fi";
+import { FiX } from "react-icons/fi";
+import { CallMadeIcon, CallReceivedIcon } from "../ui/Icons";
+import { DownloadIcons, ExpandMoreIcon } from "../ui/Icons";
 
 /**
  * TransactionsTable.jsx
- * Plain React + Tailwind version (no TypeScript)
+ * - Slide-in filter panel from the right
+ * - Filter presets, date range from-to, type, status
+ * - Click outside / ESC to close
+ * - Clean (ESLint warnings removed)
  */
 
+const TRANSACTION_TYPES = [
+  "Store transactions",
+  "Get Tipped",
+  "Withdrawals",
+  "Chargebacks",
+  "Cashback",
+  "Refer & Earn",
+];
+
+const STATUS_OPTIONS = ["All", "successful", "pending", "declined"];
+
+const PRESET_RANGES = {
+  Today: () => {
+    const today = new Date();
+    return { from: startOfDay(today), to: endOfDay(today) };
+  },
+  "Last 7 Days": () => {
+    const to = endOfDay(new Date());
+    const from = startOfDay(new Date(Date.now() - 6 * 24 * 60 * 60 * 1000)); // inclusive 7 days
+    return { from, to };
+  },
+  "This Month": () => {
+    const now = new Date();
+    const from = startOfDay(new Date(now.getFullYear(), now.getMonth(), 1));
+    const to = endOfDay(new Date(now.getFullYear(), now.getMonth() + 1, 0));
+    return { from, to };
+  },
+  "Last 3 Months": () => {
+    const now = new Date();
+    const to = endOfDay(now);
+    const from = startOfDay(new Date(now.getFullYear(), now.getMonth() - 2, 1));
+    return { from, to };
+  },
+};
+
+// Helpers for date start/end
+function startOfDay(d) {
+  const x = new Date(d);
+  x.setHours(0, 0, 0, 0);
+  return x;
+}
+function endOfDay(d) {
+  const x = new Date(d);
+  x.setHours(23, 59, 59, 999);
+  return x;
+}
+
 export default function TransactionsTable() {
+  // Data
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // UI state
-  const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState(""); // "", "deposit","withdrawal","successful" etc. We'll use transaction.type or status depending on your dataset
+  // UI
+  const [search] = useState("");
   const [page, setPage] = useState(1);
   const pageSize = 7;
-  const [sortKey, setSortKey] = useState("date");
-  const [sortAsc, setSortAsc] = useState(false);
-  const [showFilterPanel, setShowFilterPanel] = useState(false);
 
+  // Sorting (kept minimal; we use key only)
+  const [sortKey] = useState("date");
+  const [sortAsc] = useState(false);
+
+  // Filter panel UI
+  const [showFilterPanel, setShowFilterPanel] = useState(false);
+  const panelRef = useRef(null);
+
+  // Filter state (controlled inputs inside panel)
+  const [selectedPreset, setSelectedPreset] = useState("Last 7 Days");
+  const [customFrom, setCustomFrom] = useState("");
+  const [customTo, setCustomTo] = useState("");
+  const [typeFilter, setTypeFilter] = useState(""); // empty => all types
+  const [statusFilter, setStatusFilter] = useState("All"); // "All" or status
+
+  // Applied filters (the ones actually used to filter data)
+  const [appliedFilters, setAppliedFilters] = useState({
+    from: null,
+    to: null,
+    type: "",
+    status: "All",
+  });
+
+  // Fetch transactions
   useEffect(() => {
     let mounted = true;
-    const fetchData = async () => {
+    (async () => {
       try {
         setLoading(true);
         const res = await axiosInstance.get("/transactions");
-        // API returns an array — keep as-is
         if (!mounted) return;
-        setTransactions(Array.isArray(res.data) ? res.data : res.data || []);
+        const raw = Array.isArray(res.data) ? res.data : res.data || [];
+        setTransactions(raw);
       } catch (err) {
         console.error("Failed to fetch transactions:", err);
       } finally {
         if (mounted) setLoading(false);
       }
-    };
-    fetchData();
+    })();
     return () => (mounted = false);
   }, []);
 
-  // Derived: transformed rows (ensure there are required fields)
+  // Click outside / ESC to close panel
+  useEffect(() => {
+    function onKey(e) {
+      if (e.key === "Escape") setShowFilterPanel(false);
+    }
+    function onDocClick(e) {
+      if (!showFilterPanel) return;
+      if (panelRef.current && !panelRef.current.contains(e.target)) {
+        setShowFilterPanel(false);
+      }
+    }
+    document.addEventListener("keydown", onKey);
+    document.addEventListener("mousedown", onDocClick);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.removeEventListener("mousedown", onDocClick);
+    };
+  }, [showFilterPanel]);
+
+  // Derived: normalized rows
   const transformed = useMemo(() => {
     return transactions.map((t, idx) => ({
       id: t.payment_reference || `tx-${idx}`,
-      name: (t.metadata && (t.metadata.name || t.metadata.fullName)) || "Unknown",
+      name: (t.metadata && (t.metadata.name || t.metadata.fullName)) || "-",
       country: (t.metadata && t.metadata.country) || "-",
-      type: t.type || "-", // deposit / withdrawal
-      status: t.status || "-",
+      type: (t.type || "-").toLowerCase(),
+      status: (t.status || "-").toLowerCase(),
       amount: typeof t.amount === "number" ? t.amount : parseFloat(t.amount) || 0,
       date: t.date || "",
       raw: t,
     }));
   }, [transactions]);
 
-  // Filter + search
+  // Apply search + appliedFilters + status/type filtering
   const filtered = useMemo(() => {
     return transformed
-      .filter(r => {
+      .filter((r) => {
         if (!search) return true;
         const q = search.toLowerCase();
         return (
@@ -65,15 +156,28 @@ export default function TransactionsTable() {
           (r.country && r.country.toLowerCase().includes(q))
         );
       })
-      .filter(r => {
-        if (!statusFilter) return true;
-        // statusFilter supports "deposit" / "withdrawal" / "successful" etc.
-        if (["deposit", "withdrawal"].includes(statusFilter)) {
-          return r.type === statusFilter;
+      .filter((r) => {
+        // status filter
+        if (appliedFilters.status && appliedFilters.status !== "All") {
+          if (!r.status) return false;
+          if (r.status !== appliedFilters.status.toLowerCase()) return false;
         }
-        return r.status === statusFilter;
+        // type filter
+        if (appliedFilters.type) {
+          // transform both sides to normalized form for matching
+          const norm = appliedFilters.type.toLowerCase();
+          // your dataset uses specific strings — attempt to match by substring
+          if (!r.type || !r.type.toLowerCase().includes(norm.split(" ")[0])) return false;
+        }
+        // date range filter
+        if (appliedFilters.from && appliedFilters.to) {
+          const tDate = new Date(r.date);
+          if (Number.isNaN(tDate.getTime())) return false;
+          if (tDate < appliedFilters.from || tDate > appliedFilters.to) return false;
+        }
+        return true;
       });
-  }, [transformed, search, statusFilter]);
+  }, [transformed, search, appliedFilters]);
 
   // Sorting
   const sorted = useMemo(() => {
@@ -81,7 +185,6 @@ export default function TransactionsTable() {
     arr.sort((a, b) => {
       let va = a[sortKey];
       let vb = b[sortKey];
-      // date compare
       if (sortKey === "date") {
         va = new Date(va).getTime() || 0;
         vb = new Date(vb).getTime() || 0;
@@ -90,256 +193,335 @@ export default function TransactionsTable() {
         const res = va.localeCompare(vb);
         return sortAsc ? res : -res;
       }
-      const res = (va > vb) ? 1 : va < vb ? -1 : 0;
+      const res = va > vb ? 1 : va < vb ? -1 : 0;
       return sortAsc ? res : -res;
     });
     return arr;
   }, [filtered, sortKey, sortAsc]);
 
-  // Pagination
-  const totalPages = Math.max(1, Math.ceil(sorted.length / pageSize));
-  useEffect(() => {
-    if (page > totalPages) setPage(totalPages);
-  }, [totalPages, page]);
 
   const pageData = useMemo(() => {
     const start = (page - 1) * pageSize;
     return sorted.slice(start, start + pageSize);
   }, [sorted, page]);
 
-  // Actions: update local UI (no server call)
-  const markAsPaid = (id) => {
-    setTransactions(prev => prev.map(t => ( (t.payment_reference || t.id) === id ? { ...t, status: "paid" } : t )));
-  };
-  const markAsRefunded = (id) => {
-    setTransactions(prev => prev.map(t => ( (t.payment_reference || t.id) === id ? { ...t, status: "refunded" } : t )));
-  };
-
   // Export CSV
   const exportCSV = () => {
-    const headers = ["Reference","Name","Type","Status","Amount","Date","Country"];
-    const rows = sorted.map(r => [
+    const headers = ["Reference", "Name", "Type", "Status", "Amount", "Date", "Country"];
+    const rows = sorted.map((r) => [
       r.id,
       r.name,
       r.type,
-      r.status,
+      r.status.charAt(0).toUpperCase() + r.status.slice(1),
       r.amount.toFixed(2),
       new Date(r.date).toLocaleDateString(),
       r.country,
     ]);
-    const csv = [headers, ...rows].map(r => r.map(cell => `"${String(cell).replace(/"/g,'""')}"`).join(",")).join("\n");
+    const csv = [headers, ...rows].map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `transactions_${new Date().toISOString().slice(0,10)}.csv`;
+    a.download = `transactions_${new Date().toISOString().slice(0, 10)}.csv`;
     document.body.appendChild(a);
     a.click();
     a.remove();
     URL.revokeObjectURL(url);
   };
 
-  const changeSort = (key) => {
-    if (sortKey === key) setSortAsc(!sortAsc);
-    else {
-      setSortKey(key);
-      setSortAsc(true);
+  // Apply filters: compute date range from selectedPreset or custom, set appliedFilters
+  const applyFilters = () => {
+    let from = null;
+    let to = null;
+    if (selectedPreset !== "Custom") {
+      const presetFn = PRESET_RANGES[selectedPreset];
+      if (presetFn) {
+        const range = presetFn();
+        from = range.from;
+        to = range.to;
+      }
+    } else {
+      // custom
+      if (customFrom) from = startOfDay(new Date(customFrom));
+      if (customTo) to = endOfDay(new Date(customTo));
     }
+
+    setAppliedFilters({
+      from,
+      to,
+      type: typeFilter,
+      status: statusFilter || "All",
+    });
+
+    // close panel after applying
+    setShowFilterPanel(false);
+    // reset to first page
+    setPage(1);
+  };
+
+  // Quick handler to change preset and clear custom inputs
+  const choosePreset = (p) => {
+    setSelectedPreset(p);
+    setCustomFrom("");
+    setCustomTo("");
   };
 
   // Summary text
   const summaryText = `${transactions.length} Transactions`;
 
   return (
-    <div className="w-full space-y-4">
+    <div className="w-full space-y-4 px-6 lg:px-10">
       {/* Top bar: summary left, actions right */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-lg font-semibold">Transactions</h2>
-          <p className="text-sm text-gray-500">{summaryText}</p>
+          <h2 className="text-2xl font-semibold">{summaryText}</h2>
+          <p className="text-sm text-gray-500">Your transactions for the selected range</p>
         </div>
 
         <div className="flex items-center gap-2">
           <button
-            className="inline-flex items-center gap-2 px-3 py-2 border rounded hover:bg-gray-50"
-            onClick={() => setShowFilterPanel(prev => !prev)}
+            onClick={() => setShowFilterPanel((v) => !v)}
+            className="inline-flex items-center gap-2 px-3 py-2 rounded hover:bg-gray-50"
             aria-expanded={showFilterPanel}
+            aria-controls="transactions-filter-panel"
           >
-            <FiFilter className="h-4 w-4" />
             <span>Filter</span>
+            <ExpandMoreIcon className="h-4 w-4" />
           </button>
 
           <button
             onClick={exportCSV}
-            className="inline-flex items-center gap-2 px-3 py-2 bg-white border rounded hover:bg-gray-50"
+            className="inline-flex items-center gap-2 px-3 py-2 bg-white rounded hover:bg-gray-50"
             title="Export CSV"
           >
-            <FiDownload className="h-4 w-4" />
             <span className="text-sm">Export</span>
+            <DownloadIcons className="h-4 w-4" />
           </button>
         </div>
       </div>
 
-      {/* Filter panel placeholder */}
+      {/* Filter slide-in panel (right) */}
       {showFilterPanel && (
-        <div className="p-4 border rounded bg-white">
-          <div className="flex gap-3 items-center">
-            <div className="relative flex-1">
-              <FiSearch className="absolute left-3 top-3 text-gray-400" />
-              <input
-                className="w-full pl-10 pr-3 py-2 border rounded"
-                placeholder="Search name, reference or country..."
-                value={search}
-                onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-              />
+        <>
+          {/* Backdrop */}
+          <div className="fixed inset-0 bg-black/30 z-40" aria-hidden="true" />
+
+          {/* Panel */}
+          <aside
+            id="transactions-filter-panel"
+            ref={panelRef}
+            className="fixed right-0 top-0 h-full w-full sm:w-[420px] bg-white z-50 shadow-2xl transform transition-transform"
+            style={{ transform: showFilterPanel ? "translateX(0)" : "translateX(100%)" }}
+            role="dialog"
+            aria-modal="true"
+          >
+            <div className="flex items-center justify-between p-4">
+              <h3 className="text-lg font-medium">Filters</h3>
+              <div className="flex items-center gap-2">
+                <button
+                  className="px-3 py-2 rounded-md hover:bg-gray-100"
+                  onClick={() => {
+                    // reset filter UI to current applied filters
+                    if (appliedFilters.from && appliedFilters.to) {
+                      setSelectedPreset("Custom");
+                      setCustomFrom(formatISODate(appliedFilters.from));
+                      setCustomTo(formatISODate(appliedFilters.to));
+                    } else {
+                      setSelectedPreset("Last 7 Days");
+                      setCustomFrom("");
+                      setCustomTo("");
+                    }
+                    setTypeFilter(appliedFilters.type || "");
+                    setStatusFilter(appliedFilters.status || "All");
+                  }}
+                >
+                  Reset
+                </button>
+                <button
+                  aria-label="Close filters"
+                  className="p-2 rounded-md hover:bg-gray-100"
+                  onClick={() => setShowFilterPanel(false)}
+                >
+                  <FiX className="w-5 h-5" />
+                </button>
+              </div>
             </div>
 
-            <div className="flex gap-2">
-              <button
-                className={`px-3 py-2 rounded ${statusFilter === "" ? "bg-gray-900 text-white" : "bg-white border"}`}
-                onClick={() => { setStatusFilter(""); setPage(1); }}
-              >
-                All
-              </button>
-              <button
-                className={`px-3 py-2 rounded ${statusFilter === "deposit" ? "bg-green-600 text-white" : "bg-white border"}`}
-                onClick={() => { setStatusFilter("deposit"); setPage(1); }}
-              >
-                Deposit
-              </button>
-              <button
-                className={`px-3 py-2 rounded ${statusFilter === "withdrawal" ? "bg-red-600 text-white" : "bg-white border"}`}
-                onClick={() => { setStatusFilter("withdrawal"); setPage(1); }}
-              >
-                Withdrawal
-              </button>
-              <button
-                className={`px-3 py-2 rounded ${statusFilter === "successful" ? "bg-green-600 text-white" : "bg-white border"}`}
-                onClick={() => { setStatusFilter("successful"); setPage(1); }}
-              >
-                Successful
-              </button>
-            </div>
+            <div className="p-4 overflow-y-auto h-full">
+              {/* Date Range Presets */}
+              <div className="mb-4">
+                <h4 className="text-sm font-medium mb-2">Date Range</h4>
+                <div className="grid grid-cols-1 gap-2">
+                  {Object.keys(PRESET_RANGES).map((key) => (
+                    <label key={key} className="inline-flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="preset"
+                        value={key}
+                        checked={selectedPreset === key}
+                        onChange={() => choosePreset(key)}
+                        className="form-radio"
+                      />
+                      <span className="text-sm">{key}</span>
+                    </label>
+                  ))}
 
-            <div>
-              <button
-                className="px-3 py-2 bg-blue-600 text-white rounded"
-                onClick={() => { /* placeholder for applying advanced filters later */ }}
-              >
-                Apply
-              </button>
+                  <label className="inline-flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="preset"
+                      value="Custom"
+                      checked={selectedPreset === "Custom"}
+                      onChange={() => setSelectedPreset("Custom")}
+                      className="form-radio"
+                    />
+                    <span className="text-sm">Custom</span>
+                  </label>
+
+                  {/* Custom date inputs */}
+                  {selectedPreset === "Custom" && (
+                    <div className="mt-2 flex gap-2">
+                      <input
+                        type="date"
+                        className="border px-2 py-2 rounded w-1/2"
+                        value={customFrom}
+                        onChange={(e) => setCustomFrom(e.target.value)}
+                      />
+                      <input
+                        type="date"
+                        className="border px-2 py-2 rounded w-1/2"
+                        value={customTo}
+                        onChange={(e) => setCustomTo(e.target.value)}
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Transaction Type */}
+              <div className="mb-4">
+                <h4 className="text-sm font-medium mb-2">Transaction Type</h4>
+                <select
+                  className="w-full border rounded px-3 py-2"
+                  value={typeFilter}
+                  onChange={(e) => setTypeFilter(e.target.value)}
+                >
+                  <option value="">All</option>
+                  {TRANSACTION_TYPES.map((t) => (
+                    <option key={t} value={t}>
+                      {t}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Status */}
+              <div className="mb-4">
+                <h4 className="text-sm font-medium mb-2">Status</h4>
+                <select
+                  className="w-full border rounded px-3 py-2"
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                >
+                  {STATUS_OPTIONS.map((s) => (
+                    <option key={s} value={s}>
+                      {s === "All" ? "All" : s.charAt(0).toUpperCase() + s.slice(1)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="mt-6">
+                <button
+                  onClick={applyFilters}
+                  className="w-full px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                >
+                  Apply
+                </button>
+              </div>
             </div>
-          </div>
-        </div>
+          </aside>
+        </>
       )}
 
-      {/* Table */}
-      <div className="overflow-x-auto bg-white rounded border">
-        <table className="min-w-full divide-y table-auto">
-          <thead className="bg-white sticky top-0 z-10">
-            <tr>
-              <th className="px-4 py-3 text-left text-sm font-medium cursor-pointer" onClick={() => changeSort("id")}>Reference</th>
-              <th className="px-4 py-3 text-left text-sm font-medium cursor-pointer" onClick={() => changeSort("name")}>Name</th>
-              <th className="px-4 py-3 text-left text-sm font-medium">Country</th>
-              <th className="px-4 py-3 text-right text-sm font-medium cursor-pointer" onClick={() => changeSort("amount")}>Amount</th>
-              <th className="px-4 py-3 text-left text-sm font-medium cursor-pointer" onClick={() => changeSort("date")}>Date</th>
-              <th className="px-4 py-3 text-left text-sm font-medium">Type</th>
-              <th className="px-4 py-3 text-left text-sm font-medium">Status</th>
-              <th className="px-4 py-3 text-right text-sm font-medium">Actions</th>
-            </tr>
-          </thead>
-
-          <tbody className="bg-white divide-y">
+      {/* Transactions list */}
+      <div className="overflow-x-auto bg-white rounded">
+        <div className="min-w-full">
+          <div className="bg-white">
             {loading ? (
-              <tr>
-                <td colSpan="8" className="px-6 py-8 text-center text-gray-500">Loading transactions...</td>
-              </tr>
+              <div className="px-6 py-8 text-center text-gray-500">Loading transactions...</div>
             ) : pageData.length === 0 ? (
-              <tr>
-                <td colSpan="8" className="px-6 py-8 text-center text-gray-500">No transactions found</td>
-              </tr>
+              <div className="px-6 py-8 text-center text-gray-500">
+                No matching transactions found for the selected filter.
+              </div>
             ) : (
               pageData.map((r) => (
-                <tr key={r.id}>
-                  <td className="px-4 py-3 text-sm font-medium">{r.id}</td>
-                  <td className="px-4 py-3 text-sm">
+                <div key={r.id} className="flex m-2 lg:m-4 items-center justify-between p-3  rounded">
+                  <div className="flex items-center gap-3">
+                    <div className="w-[60px] h-[60px]">
+                      <span
+                        className={`w-full h-full inline-flex items-center justify-center rounded-full ${
+                          r.type === "deposit" ? "bg-green-100 text-green-700" : r.type === "withdrawal" ? "bg-red-100 text-red-700" : "bg-gray-100 text-gray-600"
+                        }`}
+                      >
+                        {r.type === "deposit" && <CallReceivedIcon />}
+                        {r.type === "withdrawal" && <CallMadeIcon />}
+                      </span>
+                    </div>
+
                     <div className="flex flex-col">
-                      <span className="font-medium">{r.name}</span>
-                      <span className="text-xs text-gray-400">{r.raw.metadata?.email || "-"}</span>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 text-sm">{r.country}</td>
-                  <td className="px-4 py-3 text-sm text-right">₦{Number(r.amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                  <td className="px-4 py-3 text-sm">{r.date ? new Date(r.date).toLocaleDateString() : "-"}</td>
-                  <td className="px-4 py-3 text-sm">
-                    <span className={`px-2 py-1 text-xs rounded ${r.type === "deposit" ? "bg-green-100 text-green-800" : r.type === "withdrawal" ? "bg-red-100 text-red-800" : "bg-gray-100 text-gray-800"}`}>
-                      {r.type}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-sm">
-                    <span className={`px-2 py-1 text-xs rounded ${r.status === "successful" || r.status === "paid" ? "bg-green-100 text-green-800" : r.status === "pending" ? "bg-yellow-100 text-yellow-800" : r.status === "refunded" ? "bg-indigo-100 text-indigo-800" : "bg-gray-100 text-gray-800"}`}>
-                      {r.status}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-sm text-right">
-                    <div className="inline-block relative">
-                      <button className="p-2 hover:bg-gray-100 rounded" aria-haspopup="menu" aria-expanded="false">
-                        <FiMoreVertical className="w-5 h-5" />
-                      </button>
+                      <span className="font-semibold text-[16px]">
+                        {r.raw.metadata?.product_name || "Cash Withdrawal"}
+                      </span>
 
-                      {/* Simple action menu (replace with a proper dropdown lib if desired) */}
-                      <div className="absolute right-0 mt-2 w-40 bg-white border rounded shadow-md hidden group-hover:block">
-                        {/* left hidden by default; this is a placeholder */}
-                      </div>
-
-                      {/* Quick inline actions */}
-                      <div className="flex justify-end gap-2 mt-1">
-                        <button title="View invoice" className="p-2 hover:bg-gray-100 rounded" onClick={() => alert(`View invoice ${r.id}`)}>
-                          <FiFileText className="w-4 h-4" />
-                        </button>
-                        <button title="Download" className="p-2 hover:bg-gray-100 rounded" onClick={() => alert(`Download ${r.id}`)}>
-                          <FiDownload className="w-4 h-4" />
-                        </button>
-                        <button title="Profile" className="p-2 hover:bg-gray-100 rounded" onClick={() => alert(`Open profile for ${r.name}`)}>
-                          <FiUser className="w-4 h-4" />
-                        </button>
-                        {r.status !== "paid" ? (
-                          <button className="px-2 py-1 bg-green-600 text-white text-xs rounded" onClick={() => markAsPaid(r.id)}>Mark paid</button>
+                      <span className="text-sm text-gray-500">
+                        {r.name ? (
+                          r.name
                         ) : (
-                          <button className="px-2 py-1 bg-indigo-600 text-white text-xs rounded" onClick={() => markAsRefunded(r.id)}>Refund</button>
+                          <span
+                            className={`py-1 text-sm rounded ${
+                              r.status === "successful"
+                                ? "text-green-800 font-bold"
+                                : r.status === "pending"
+                                ? "text-yellow-800"
+                                : r.status === "declined"
+                                ? "text-red-800"
+                                : "text-gray-800"
+                            }`}
+                          >
+                            {r.status.charAt(0).toUpperCase() + r.status.slice(1)}
+                          </span>
                         )}
-                      </div>
+                      </span>
                     </div>
-                  </td>
-                </tr>
+                  </div>
+
+                  <div className="flex flex-col items-end">
+                    <p className="text-[16px] font-bold">
+                      USD {Number(r.amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </p>
+                    <p className="text-sm text-gray-500">
+                      {r.date ? new Date(r.date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "-"}
+                    </p>
+                  </div>
+                </div>
               ))
             )}
-          </tbody>
-        </table>
-      </div>
-
-      {/* Pagination */}
-      <div className="flex items-center justify-between">
-        <div className="text-sm text-gray-600">Showing {Math.min((page - 1) * pageSize + 1, sorted.length)} - {Math.min(page * pageSize, sorted.length)} of {sorted.length}</div>
-
-        <div className="flex items-center gap-2">
-          <button
-            className="px-3 py-2 border rounded disabled:opacity-50"
-            onClick={() => setPage(p => Math.max(1, p - 1))}
-            disabled={page === 1}
-          >
-            <FiChevronLeft />
-          </button>
-          <div className="px-3 py-2 border rounded">Page {page} / {totalPages}</div>
-          <button
-            className="px-3 py-2 border rounded disabled:opacity-50"
-            onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-            disabled={page === totalPages}
-          >
-            <FiChevronRight />
-          </button>
+          </div>
         </div>
       </div>
     </div>
   );
 }
+
+// small helper: format Date -> yyyy-mm-dd for <input type="date">
+function formatISODate(d) {
+  if (!d) return "";
+  const dt = new Date(d);
+  const yyyy = dt.getFullYear();
+  const mm = String(dt.getMonth() + 1).padStart(2, "0");
+  const dd = String(dt.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+
